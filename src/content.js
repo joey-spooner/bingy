@@ -54,11 +54,26 @@ function scrapeAndSend() {
   const text = document.body?.innerText ?? '';
   const snapshot = parseSnapshot(text);
 
-  // sendMessage returns a Promise in Chrome 99+. We suppress the
-  // "receiving end does not exist" error that fires when the MV3 service
-  // worker is sleeping — the next poll will retry automatically.
-  chrome.runtime.sendMessage({ type: 'SNAPSHOT', payload: snapshot })
-    .catch(() => {});
+  // Two distinct failure modes require two distinct guards:
+  //
+  // 1. Synchronous throw — "Extension context invalidated" fires when the
+  //    extension is reloaded while the content script is still alive.
+  //    .catch() on a Promise cannot catch synchronous errors, so we wrap
+  //    the whole call in try/catch.
+  //
+  // 2. Async callback error — "Could not establish connection / Receiving
+  //    end does not exist" fires when the MV3 service worker is sleeping.
+  //    Reading chrome.runtime.lastError inside the callback silences the
+  //    "Unchecked runtime.lastError" console warning Chrome emits when the
+  //    error goes unread. The next poll interval will retry automatically.
+  try {
+    chrome.runtime.sendMessage({ type: 'SNAPSHOT', payload: snapshot }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (_) {
+    // Context invalidated — nothing to do; intervals/observer will stop
+    // naturally once the page is torn down.
+  }
 }
 
 // ---------------------------------------------------------------------------
