@@ -9,19 +9,29 @@
 
 chrome.runtime.onMessage.addListener((msg) => {
   if (msg.type === 'PLAY_BING') {
-    playBing();
+    playBing().catch(() => {
+      // If playback fails for any reason, still signal the background so
+      // the bingInProgress guard is released and future dings can play.
+      notifyDone();
+    });
   }
 });
 
-function playBing() {
+async function playBing() {
   const ctx = new AudioContext();
+
+  // AudioContext starts in 'suspended' state when created outside a user
+  // gesture. resume() transitions it to 'running' so currentTime advances
+  // and scheduled events actually fire.
+  await ctx.resume();
+
   const osc  = ctx.createOscillator();
   const gain = ctx.createGain();
 
   osc.connect(gain);
   gain.connect(ctx.destination);
 
-  // A5 (880 Hz) → A4 (440 Hz) sweep over 0.4 s: a classic bell shape
+  // A5 (880 Hz) → A4 (440 Hz) sweep over 0.3 s: a classic bell shape
   osc.type = 'sine';
   osc.frequency.setValueAtTime(880, ctx.currentTime);
   osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
@@ -32,9 +42,16 @@ function playBing() {
   osc.start(ctx.currentTime);
   osc.stop(ctx.currentTime + 0.6);
 
-  // Once done, tell the background it can close this document.
+  // Wait for the oscillator to finish, then clean up and signal background.
   osc.onended = () => {
     ctx.close();
-    chrome.runtime.sendMessage({ type: 'OFFSCREEN_DONE' });
+    notifyDone();
   };
+}
+
+function notifyDone() {
+  // Suppress errors: background service worker may have restarted by now.
+  chrome.runtime.sendMessage({ type: 'OFFSCREEN_DONE' }, () => {
+    void chrome.runtime.lastError;
+  });
 }

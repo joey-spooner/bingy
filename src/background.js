@@ -69,32 +69,34 @@ chrome.runtime.onInstalled.addListener(async () => {
 // ---------------------------------------------------------------------------
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  stateReady.then(async () => {
-    switch (msg.type) {
+  stateReady
+    .then(async () => {
+      switch (msg.type) {
 
-      case 'SNAPSHOT':
-        await handleSnapshot(msg.payload);
-        break;
+        case 'SNAPSHOT':
+          await handleSnapshot(msg.payload);
+          break;
 
-      case 'GET_STATE':
-        sendResponse(state);
-        break;
+        case 'GET_STATE':
+          sendResponse(state);
+          break;
 
-      case 'UPDATE_SETTINGS':
-        state.thresholds = { ...state.thresholds, ...msg.thresholds };
-        state.prefs      = { ...state.prefs,      ...msg.prefs      };
-        await saveState();
-        break;
+        case 'UPDATE_SETTINGS':
+          state.thresholds = { ...state.thresholds, ...msg.thresholds };
+          state.prefs      = { ...state.prefs,      ...msg.prefs      };
+          await saveState();
+          break;
 
-      case 'TEST_BING':
-        await playBing();
-        break;
+        case 'TEST_BING':
+          await playBing();
+          break;
 
-      case 'OFFSCREEN_DONE':
-        await closeOffscreen();
-        break;
-    }
-  });
+        case 'OFFSCREEN_DONE':
+          await closeOffscreen();
+          break;
+      }
+    })
+    .catch(console.error); // surface any unhandled errors to the SW console
 
   return true; // keep message channel open for async sendResponse
 });
@@ -104,16 +106,40 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 
 async function handleSnapshot(snap) {
-  const prev = state.snapshot;
+  const prev    = state.snapshot;
   const resetAt = parseResetTime(snap.resetText);
   state.snapshot = { ...snap, resetAt, lastUpdated: Date.now() };
 
-  checkPercent('session', prev.sessionPct, snap.sessionPct, state.thresholds.session);
-  checkPercent('weekly',  prev.weeklyPct,  snap.weeklyPct,  state.thresholds.weekly);
-  checkSpend(prev.spend, snap.spend, state.thresholds.spend);
+  // Await each check so fireAlert errors propagate rather than becoming
+  // silent unhandled rejections.
+  await checkPercent('session', snap.sessionPct, state.thresholds.session);
+  await checkPercent('weekly',  snap.weeklyPct,  state.thresholds.weekly);
+  await checkSpend(snap.spend, state.thresholds.spend);
 
   await scheduleResetAlarm(resetAt);
   await saveState();
+}
+
+async function checkPercent(type, current, threshold) {
+  if (shouldReset(current, threshold) && state.triggered[type]) {
+    state.triggered[type] = false;
+    return;
+  }
+  if (shouldAlert(current, threshold, state.triggered[type])) {
+    state.triggered[type] = true;
+    await fireAlert(type, `${current}%`, `${threshold}%`);
+  }
+}
+
+async function checkSpend(current, threshold) {
+  if (shouldReset(current, threshold) && state.triggered.spend) {
+    state.triggered.spend = false;
+    return;
+  }
+  if (shouldAlert(current, threshold, state.triggered.spend)) {
+    state.triggered.spend = true;
+    await fireAlert('spend', `€${current}`, `€${threshold}`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -124,8 +150,6 @@ const ALARM_NAME = 'bingy-reset';
 
 async function scheduleResetAlarm(resetAt) {
   if (!resetAt || resetAt <= Date.now()) return;
-
-  // Replace any existing alarm with the freshly-parsed time.
   await chrome.alarms.clear(ALARM_NAME);
   chrome.alarms.create(ALARM_NAME, { when: resetAt });
 }
@@ -134,60 +158,32 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
   await stateReady;
 
-  // Session has reset — clear the triggered flag so the next crossing alerts.
   state.triggered.session = false;
   state.snapshot.resetAt  = null;
   await saveState();
 
-  if (state.prefs.soundEnabled) await playBing();
-  if (state.prefs.notificationsEnabled) {
-    chrome.notifications.create(`bingy-reset-${Date.now()}`, {
-      type:    'basic',
-      iconUrl: 'icons/icon48.png',
-      title:   'Bingy — Session Reset',
-      message: 'Your Claude session limit has reset.',
-    });
-  }
+  await fireAlert('reset', '', '');
 });
-
-function checkPercent(type, prev, current, threshold) {
-  if (shouldReset(current, threshold) && state.triggered[type]) {
-    state.triggered[type] = false;
-    return;
-  }
-  if (shouldAlert(current, threshold, state.triggered[type])) {
-    state.triggered[type] = true;
-    fireAlert(type, `${current}%`, `${threshold}%`);
-  }
-}
-
-function checkSpend(prev, current, threshold) {
-  if (shouldReset(current, threshold) && state.triggered.spend) {
-    state.triggered.spend = false;
-    return;
-  }
-  if (shouldAlert(current, threshold, state.triggered.spend)) {
-    state.triggered.spend = true;
-    fireAlert('spend', `€${current}`, `€${threshold}`);
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Alert delivery
 // ---------------------------------------------------------------------------
 
-const LABELS = { session: 'Session', weekly: 'Weekly', spend: 'Spend' };
+const LABELS = { session: 'Session', weekly: 'Weekly', spend: 'Spend', reset: 'Session reset' };
 
 async function fireAlert(type, valueStr, thresholdStr) {
   if (state.prefs.soundEnabled) {
     await playBing();
   }
   if (state.prefs.notificationsEnabled) {
+    const isReset = type === 'reset';
     chrome.notifications.create(`bingy-${type}-${Date.now()}`, {
       type:    'basic',
       iconUrl: 'icons/icon48.png',
-      title:   'Bingy Alert',
-      message: `${LABELS[type]} is at ${valueStr} (threshold: ${thresholdStr})`,
+      title:   isReset ? 'Bingy — Session Reset' : 'Bingy Alert',
+      message: isReset
+        ? 'Your Claude session limit has reset.'
+        : `${LABELS[type]} is at ${valueStr} (threshold: ${thresholdStr})`,
     });
   }
 }
@@ -197,33 +193,55 @@ async function fireAlert(type, valueStr, thresholdStr) {
 // ---------------------------------------------------------------------------
 
 // Guard: only one offscreen document allowed at a time.
-let bingInProgress = false;
+let bingInProgress  = false;
+let bingGuardTimer  = null;
 
 async function playBing() {
   if (bingInProgress) return;
   bingInProgress = true;
 
-  const contexts = await chrome.runtime.getContexts({
-    contextTypes: ['OFFSCREEN_DOCUMENT'],
-  });
+  // Failsafe: release the guard after 3 s regardless, in case OFFSCREEN_DONE
+  // is never received (e.g. offscreen document crashed or was closed).
+  bingGuardTimer = setTimeout(() => { bingInProgress = false; }, 3_000);
 
-  if (!contexts.length) {
-    await chrome.offscreen.createDocument({
-      url:           'offscreen.html',
-      reasons:       ['AUDIO_PLAYBACK'],
-      justification: 'Play bing alert sound using Web Audio API',
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
     });
-  }
 
-  chrome.runtime.sendMessage({ type: 'PLAY_BING' });
+    if (!contexts.length) {
+      await chrome.offscreen.createDocument({
+        url:           'offscreen.html',
+        reasons:       ['AUDIO_PLAYBACK'],
+        justification: 'Play bing alert sound using Web Audio API',
+      });
+    }
+
+    // Suppress lastError: if the offscreen doc isn't ready yet the 3 s
+    // failsafe above will recover.
+    chrome.runtime.sendMessage({ type: 'PLAY_BING' }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (err) {
+    // If anything throws (e.g. offscreen creation failed), release the guard
+    // immediately so the next alert can try again.
+    clearTimeout(bingGuardTimer);
+    bingInProgress = false;
+    console.error('[Bingy] playBing failed:', err);
+  }
 }
 
 async function closeOffscreen() {
+  clearTimeout(bingGuardTimer);
   bingInProgress = false;
-  const contexts = await chrome.runtime.getContexts({
-    contextTypes: ['OFFSCREEN_DOCUMENT'],
-  });
-  if (contexts.length) {
-    await chrome.offscreen.closeDocument();
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+    });
+    if (contexts.length) {
+      await chrome.offscreen.closeDocument();
+    }
+  } catch (err) {
+    console.error('[Bingy] closeOffscreen failed:', err);
   }
 }
