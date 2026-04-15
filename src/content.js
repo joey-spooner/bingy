@@ -19,7 +19,10 @@ const INITIAL_DELAY_MS  = 1_000;  // give the SPA time to paint on first load
 function scrapeAndSend() {
   const text = document.body?.innerText ?? '';
   const snapshot = parseSnapshot(text);
-  chrome.runtime.sendMessage({ type: 'SNAPSHOT', payload: snapshot });
+  // Suppress "receiving end does not exist" errors: the MV3 service worker
+  // may be sleeping when we send. The next poll will retry automatically.
+  chrome.runtime.sendMessage({ type: 'SNAPSHOT', payload: snapshot })
+    .catch(() => {});
 }
 
 // ---------------------------------------------------------------------------
