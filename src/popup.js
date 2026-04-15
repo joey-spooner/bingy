@@ -130,6 +130,9 @@ async function loadState() {
   // Pref checkboxes
   el('pref-sound').checked         = prefs.soundEnabled;
   el('pref-notifications').checked = prefs.notificationsEnabled;
+
+  // Refresh interval
+  el('pref-refresh').value = prefs.refreshInterval ?? 30;
 }
 
 /* ── Save helpers ─────────────────────────────────────────────────── */
@@ -145,6 +148,7 @@ function saveSettings() {
     prefs: {
       soundEnabled:         el('pref-sound').checked,
       notificationsEnabled: el('pref-notifications').checked,
+      refreshInterval:      Math.max(0, Number(el('pref-refresh').value)),
     },
   });
 }
@@ -169,6 +173,8 @@ document.addEventListener('DOMContentLoaded', () => {
   ['pref-sound', 'pref-notifications'].forEach((id) => {
     el(id).addEventListener('change', saveSettings);
   });
+
+  el('pref-refresh').addEventListener('input', debouncedSave);
 
   el('btn-test-sound').addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'TEST_BING' });

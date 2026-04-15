@@ -34,6 +34,7 @@ const DEFAULT_STATE = {
   prefs: {
     soundEnabled:         true,
     notificationsEnabled: true,
+    refreshInterval:      30,   // seconds; 0 = disabled
   },
 };
 
@@ -47,6 +48,7 @@ let state = structuredClone(DEFAULT_STATE);
 
 const stateReady = chrome.storage.local.get('state').then((data) => {
   if (data.state) state = data.state;
+  setupRefreshAlarm(); // start refresh cycle based on saved settings
 });
 
 async function saveState() {
@@ -85,6 +87,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           state.thresholds = { ...state.thresholds, ...msg.thresholds };
           state.prefs      = { ...state.prefs,      ...msg.prefs      };
           await saveState();
+          setupRefreshAlarm(); // reconfigure if interval changed
           break;
 
         case 'TEST_BING':
@@ -155,6 +158,12 @@ async function scheduleResetAlarm(resetAt) {
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === REFRESH_ALARM) {
+    await stateReady;
+    await refreshUsageTab();
+    return;
+  }
+
   if (alarm.name !== ALARM_NAME) return;
   await stateReady;
 
@@ -185,6 +194,50 @@ async function fireAlert(type, valueStr, thresholdStr) {
         ? 'Your Claude session limit has reset.'
         : `${LABELS[type]} is at ${valueStr} (threshold: ${thresholdStr})`,
     });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Tab refresh system
+// ---------------------------------------------------------------------------
+
+const REFRESH_ALARM = 'bingy-refresh';
+const USAGE_URL     = 'https://claude.ai/settings/usage*';
+
+/**
+ * Create (or recreate) the repeating refresh alarm.
+ * Called on startup and whenever the refresh interval setting changes.
+ */
+function setupRefreshAlarm() {
+  chrome.alarms.clear(REFRESH_ALARM, () => {
+    const secs = state.prefs.refreshInterval ?? 30;
+    if (secs <= 0) return; // 0 = disabled
+    // Chrome clamps periodInMinutes to 1 min for store extensions;
+    // for developer-mode (unpacked) installs any interval works.
+    chrome.alarms.create(REFRESH_ALARM, { periodInMinutes: secs / 60 });
+  });
+}
+
+/**
+ * Reload the claude.ai/settings/usage tab so the page re-fetches fresh
+ * data from Anthropic's servers. Skips the tab if the user is actively
+ * viewing it (active tab in the focused window) to avoid disruption.
+ */
+async function refreshUsageTab() {
+  // Find the tab the user is currently looking at.
+  const [focusedTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+
+  const usageTabs = await chrome.tabs.query({ url: USAGE_URL });
+
+  if (usageTabs.length === 0) {
+    // No usage tab open — nothing to reload. Content script will scrape
+    // whenever the user next visits the page naturally.
+    return;
+  }
+
+  for (const tab of usageTabs) {
+    if (tab.id === focusedTab?.id) continue; // don't interrupt active reading
+    chrome.tabs.reload(tab.id);
   }
 }
 

@@ -164,3 +164,12 @@ button {
 
 button:hover  { background: #f0f0f0; }
 button:active { background: #e8e8e8; }
+
+/* ── Hint text ──────────────────────────────────────────────────────── */
+
+.hint {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 3px;
+  line-height: 1.4;
+}

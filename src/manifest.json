@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Monitors Claude usage and alerts you before limits are reached.",
 
-  "permissions": ["storage", "notifications", "offscreen", "alarms"],
+  "permissions": ["storage", "notifications", "offscreen", "alarms", "tabs"],
   "host_permissions": ["https://claude.ai/*"],
 
   "background": {

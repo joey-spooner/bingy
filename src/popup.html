@@ -100,6 +100,20 @@
     <button id="btn-test-sound">Test sound</button>
   </section>
 
+  <!-- ── Refresh ───────────────────────────────────────────── -->
+  <section>
+    <h2>Auto-refresh</h2>
+
+    <label class="field">
+      Interval
+      <div class="input-wrap">
+        <input type="number" id="pref-refresh" min="0" step="10" style="width:60px">
+        <span class="unit">s</span>
+      </div>
+    </label>
+    <p class="hint">Reloads the usage tab in the background to fetch fresh data. Set to 0 to disable.</p>
+  </section>
+
   <script src="popup.js"></script>
 </body>
 </html>
