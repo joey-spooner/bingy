@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bingy</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <header>
+    <h1>Bingy 🔔</h1>
+    <span class="last-updated" id="last-updated"></span>
+  </header>
+
+  <!-- ── Usage meters ─────────────────────────────────────── -->
+  <section>
+    <h2>Current usage</h2>
+
+    <div class="meter">
+      <div class="meter-label">
+        <span>Session</span>
+        <span class="meter-value" id="val-session">—</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="bar-session"></div>
+        <div class="bar-threshold" id="thr-marker-session"></div>
+      </div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-label">
+        <span>Weekly</span>
+        <span class="meter-value" id="val-weekly">—</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="bar-weekly"></div>
+        <div class="bar-threshold" id="thr-marker-weekly"></div>
+      </div>
+    </div>
+
+    <div class="meter">
+      <div class="meter-label">
+        <span>Spend</span>
+        <span class="meter-value" id="val-spend">—</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="bar-spend"></div>
+        <div class="bar-threshold" id="thr-marker-spend"></div>
+      </div>
+    </div>
+
+    <p class="reset-text" id="reset-text"></p>
+  </section>
+
+  <!-- ── Thresholds ───────────────────────────────────────── -->
+  <section>
+    <h2>Alert thresholds</h2>
+
+    <label class="field">
+      Session
+      <div class="input-wrap">
+        <input type="number" id="thr-session" min="1" max="100" step="1">
+        <span class="unit">%</span>
+      </div>
+    </label>
+
+    <label class="field">
+      Weekly
+      <div class="input-wrap">
+        <input type="number" id="thr-weekly" min="1" max="100" step="1">
+        <span class="unit">%</span>
+      </div>
+    </label>
+
+    <label class="field">
+      Spend
+      <div class="input-wrap">
+        <span class="unit prefix">€</span>
+        <input type="number" id="thr-spend" min="1" step="1">
+      </div>
+    </label>
+  </section>
+
+  <!-- ── Preferences ──────────────────────────────────────── -->
+  <section>
+    <h2>Alerts</h2>
+
+    <label class="toggle">
+      <input type="checkbox" id="pref-sound">
+      <span>Sound</span>
+    </label>
+
+    <label class="toggle">
+      <input type="checkbox" id="pref-notifications">
+      <span>Browser notifications</span>
+    </label>
+
+    <button id="btn-test-sound">Test sound</button>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>

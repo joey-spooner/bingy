@@ -1,0 +1,158 @@
+/* ── Reset & base ───────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+  background: #fff;
+  width: 300px;
+  padding: 0 0 12px;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────── */
+
+header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid #eee;
+}
+
+h1 { font-size: 15px; font-weight: 700; }
+
+.last-updated {
+  font-size: 10px;
+  color: #999;
+}
+
+/* ── Sections ───────────────────────────────────────────────────────── */
+
+section {
+  padding: 10px 14px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+section:last-of-type { border-bottom: none; }
+
+h2 {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+/* ── Usage meters ───────────────────────────────────────────────────── */
+
+.meter { margin-bottom: 8px; }
+
+.meter-label {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 3px;
+  font-size: 12px;
+}
+
+.meter-value { font-weight: 600; }
+
+.bar-track {
+  position: relative;
+  height: 6px;
+  background: #f0f0f0;
+  border-radius: 3px;
+  overflow: visible;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: #4f8ef7;
+  width: 0%;
+  transition: width 0.3s ease, background 0.3s ease;
+}
+
+.bar-fill.warn  { background: #f5a623; }
+.bar-fill.alert { background: #e74c3c; }
+
+/* Threshold marker — a vertical tick on the bar track */
+.bar-threshold {
+  position: absolute;
+  top: -2px;
+  height: 10px;
+  width: 2px;
+  background: #aaa;
+  border-radius: 1px;
+  display: none;
+}
+
+.reset-text {
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+  margin-bottom: 4px;
+  min-height: 14px;
+}
+
+/* ── Threshold inputs ───────────────────────────────────────────────── */
+
+.field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  cursor: default;
+}
+
+.input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.unit { color: #777; font-size: 12px; }
+
+input[type="number"] {
+  width: 54px;
+  padding: 2px 5px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: right;
+  outline: none;
+}
+
+input[type="number"]:focus { border-color: #4f8ef7; }
+
+/* ── Toggles ────────────────────────────────────────────────────────── */
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+input[type="checkbox"] { accent-color: #4f8ef7; cursor: pointer; }
+
+/* ── Test button ────────────────────────────────────────────────────── */
+
+button {
+  display: block;
+  margin: 6px 0 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  background: #fafafa;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button:hover  { background: #f0f0f0; }
+button:active { background: #e8e8e8; }
