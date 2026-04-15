@@ -1,4 +1,4 @@
-import { parseSnapshot, shouldAlert, shouldReset } from '../src/utils/parser.js';
+import { parseSnapshot, shouldAlert, shouldReset, parseResetTime } from '../src/utils/parser.js';
 
 // ---------------------------------------------------------------------------
 // parseSnapshot
@@ -55,6 +55,60 @@ describe('parseSnapshot', () => {
     const result = parseSnapshot('Session\n60% used\nResets tomorrow');
     expect(result.sessionPct).toBe(60);
     expect(result.weeklyPct).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseResetTime
+// ---------------------------------------------------------------------------
+
+describe('parseResetTime', () => {
+  // Fixed anchor: Wednesday 2026-04-15 12:00:00 UTC
+  const NOW = new Date('2026-04-15T12:00:00.000Z').getTime();
+
+  test('parses "Resets in 3 hours"', () => {
+    expect(parseResetTime('Resets in 3 hours', NOW)).toBe(NOW + 3 * 3_600_000);
+  });
+
+  test('parses "Resets in 45 minutes"', () => {
+    expect(parseResetTime('Resets in 45 minutes', NOW)).toBe(NOW + 45 * 60_000);
+  });
+
+  test('parses "Resets in 2 days"', () => {
+    expect(parseResetTime('Resets in 2 days', NOW)).toBe(NOW + 2 * 86_400_000);
+  });
+
+  test('parses singular "Resets in 1 hour"', () => {
+    expect(parseResetTime('Resets in 1 hour', NOW)).toBe(NOW + 3_600_000);
+  });
+
+  test('parses "Resets in 1 minute"', () => {
+    expect(parseResetTime('Resets in 1 minute', NOW)).toBe(NOW + 60_000);
+  });
+
+  test('parses "Resets tomorrow"', () => {
+    const tomorrow = new Date(NOW);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    expect(parseResetTime('Resets tomorrow', NOW)).toBe(tomorrow.getTime());
+  });
+
+  test('parses "Resets on Sunday"', () => {
+    const d = new Date(NOW);
+    let diff = 0 - d.getDay(); // Sunday = 0
+    if (diff <= 0) diff += 7;
+    const expected = new Date(NOW);
+    expected.setDate(expected.getDate() + diff);
+    expected.setHours(0, 0, 0, 0);
+    expect(parseResetTime('Resets on Sunday', NOW)).toBe(expected.getTime());
+  });
+
+  test('returns null for unrecognised format', () => {
+    expect(parseResetTime('Resets April 20th', NOW)).toBeNull();
+  });
+
+  test('returns null for null input', () => {
+    expect(parseResetTime(null, NOW)).toBeNull();
   });
 });
 
