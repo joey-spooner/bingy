@@ -4,6 +4,21 @@ Track all work sessions here. Add a new entry at the top for each session.
 
 ---
 
+## 2026-04-15 — Reset timer + bug fix
+
+**Session:** Add reset timer feature; fix content.js console error
+**By:** Claude (via Claude Code)
+**Changes:**
+- `tests/parser.test.js` — 9 new tests for `parseResetTime` (TDD, written first)
+- `src/utils/parser.js` — `parseResetTime`: converts reset text to timestamp (26 tests green)
+- `src/content.js` — fix: `.catch(() => {})` on `sendMessage` to suppress SW-asleep error
+- `src/manifest.json` — add `"alarms"` permission
+- `src/background.js` — schedule `chrome.alarm` on each snapshot; on fire: clear triggered flag, bing + notify
+- `src/popup.html/css/js` — live countdown display ("Resets in 2h 3m"), updates every second
+- `docs/features/reset-timer.md` — feature documentation
+
+---
+
 ## 2026-04-15 — Full extension build
 
 **Session:** Implement the complete Chrome extension
