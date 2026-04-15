@@ -49,6 +49,69 @@ export function parseSnapshot(text) {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// Reset time parser
+// ---------------------------------------------------------------------------
+
+const DAY_MS  = 86_400_000;
+const HOUR_MS = 3_600_000;
+const MIN_MS  = 60_000;
+const UNIT_MS = { minute: MIN_MS, hour: HOUR_MS, day: DAY_MS };
+const DAYS    = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+
+/**
+ * Convert a reset-text string (e.g. "Resets in 3 hours") to an absolute
+ * timestamp in milliseconds.
+ *
+ * Accepts an optional `now` parameter (defaults to Date.now()) so unit
+ * tests can pass a fixed anchor without needing fake timers.
+ *
+ * Supported formats:
+ *   "Resets in N minutes/hours/days"
+ *   "Resets tomorrow"
+ *   "Resets on Sunday" (or any day name)
+ *
+ * @param {string|null} resetText
+ * @param {number}      [now] - timestamp to use as "now" (defaults to Date.now())
+ * @returns {number|null} absolute timestamp, or null if unrecognised
+ */
+export function parseResetTime(resetText, now = Date.now()) {
+  if (!resetText) return null;
+
+  // "Resets in N minutes/hours/days"
+  const inMatch = resetText.match(/Resets?\s+in\s+(\d+)\s+(minute|hour|day)s?/i);
+  if (inMatch) {
+    const ms = UNIT_MS[inMatch[2].toLowerCase()];
+    return now + parseInt(inMatch[1], 10) * ms;
+  }
+
+  // "Resets tomorrow"
+  if (/tomorrow/i.test(resetText)) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  // "Resets on Sunday" (or any weekday name)
+  const dayMatch = resetText.match(
+    /Resets?\s+on\s+(sunday|monday|tuesday|wednesday|thursday|friday|saturday)/i,
+  );
+  if (dayMatch) {
+    const target = DAYS.indexOf(dayMatch[1].toLowerCase());
+    const d = new Date(now);
+    let diff = target - d.getDay();
+    if (diff <= 0) diff += 7;
+    d.setDate(d.getDate() + diff);
+    d.setHours(0, 0, 0, 0);
+    return d.getTime();
+  }
+
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+
 /**
  * Decides whether an alert should fire for a given usage dimension.
  *
