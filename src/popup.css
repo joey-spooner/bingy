@@ -173,3 +173,11 @@ button:active { background: #e8e8e8; }
   margin-top: 3px;
   line-height: 1.4;
 }
+
+.refresh-countdown {
+  font-size: 11px;
+  color: #4f8ef7;
+  font-weight: 600;
+  min-height: 14px;
+  margin-top: 4px;
+}

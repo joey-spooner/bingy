@@ -46,9 +46,9 @@ const DEFAULT_STATE = {
 // await this promise so they never operate on stale defaults.
 let state = structuredClone(DEFAULT_STATE);
 
-const stateReady = chrome.storage.local.get('state').then((data) => {
+const stateReady = chrome.storage.local.get('state').then(async (data) => {
   if (data.state) state = data.state;
-  setupRefreshAlarm(); // start refresh cycle based on saved settings
+  await setupRefreshAlarm(); // start refresh cycle based on saved settings
 });
 
 async function saveState() {
@@ -87,7 +87,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           state.thresholds = { ...state.thresholds, ...msg.thresholds };
           state.prefs      = { ...state.prefs,      ...msg.prefs      };
           await saveState();
-          setupRefreshAlarm(); // reconfigure if interval changed
+          await setupRefreshAlarm(); // reconfigure if interval changed
           break;
 
         case 'TEST_BING':
@@ -208,36 +208,32 @@ const USAGE_URL     = 'https://claude.ai/settings/usage*';
  * Create (or recreate) the repeating refresh alarm.
  * Called on startup and whenever the refresh interval setting changes.
  */
-function setupRefreshAlarm() {
-  chrome.alarms.clear(REFRESH_ALARM, () => {
-    const secs = state.prefs.refreshInterval ?? 30;
-    if (secs <= 0) return; // 0 = disabled
-    // Chrome clamps periodInMinutes to 1 min for store extensions;
-    // for developer-mode (unpacked) installs any interval works.
-    chrome.alarms.create(REFRESH_ALARM, { periodInMinutes: secs / 60 });
-  });
+async function setupRefreshAlarm() {
+  await chrome.alarms.clear(REFRESH_ALARM);
+  const secs = state.prefs.refreshInterval ?? 30;
+  if (secs <= 0) return; // 0 = disabled
+  // Chrome clamps periodInMinutes to 1 min for store extensions;
+  // for developer-mode (unpacked) installs any interval works.
+  chrome.alarms.create(REFRESH_ALARM, { periodInMinutes: secs / 60 });
 }
 
 /**
  * Reload the claude.ai/settings/usage tab so the page re-fetches fresh
- * data from Anthropic's servers. Skips the tab if the user is actively
- * viewing it (active tab in the focused window) to avoid disruption.
+ * data from Anthropic's servers. If no usage tab is open, opens one in
+ * the background so the content script can scrape fresh data.
  */
 async function refreshUsageTab() {
-  // Find the tab the user is currently looking at.
-  const [focusedTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-
   const usageTabs = await chrome.tabs.query({ url: USAGE_URL });
 
-  if (usageTabs.length === 0) {
-    // No usage tab open — nothing to reload. Content script will scrape
-    // whenever the user next visits the page naturally.
-    return;
-  }
-
-  for (const tab of usageTabs) {
-    if (tab.id === focusedTab?.id) continue; // don't interrupt active reading
-    chrome.tabs.reload(tab.id);
+  if (usageTabs.length > 0) {
+    // Reload all matching tabs — user opted in to auto-refresh, so this is expected.
+    for (const tab of usageTabs) {
+      chrome.tabs.reload(tab.id);
+    }
+  } else {
+    // No usage tab open: create one in the background so the content script
+    // can scrape and send fresh data without the user needing to visit manually.
+    chrome.tabs.create({ url: 'https://claude.ai/settings/usage', active: false });
   }
 }
 

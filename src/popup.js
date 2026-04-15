@@ -83,6 +83,32 @@ function startCountdown(resetAt) {
   countdownTimer = setInterval(tick, 1000);
 }
 
+/* ── Refresh countdown ────────────────────────────────────────────── */
+
+let refreshCountdownTimer = null;
+
+async function startRefreshCountdown() {
+  clearInterval(refreshCountdownTimer);
+  const countdownEl = el('refresh-countdown');
+
+  // chrome.alarms is accessible directly from any extension page.
+  const alarm = await chrome.alarms.get('bingy-refresh');
+
+  if (!alarm) {
+    countdownEl.textContent = 'Auto-refresh disabled';
+    return;
+  }
+
+  function tick() {
+    const remaining = Math.max(0, Math.round((alarm.scheduledTime - Date.now()) / 1000));
+    countdownEl.textContent = remaining > 0 ? `Refreshes in ${remaining}s` : 'Refreshing…';
+  }
+
+  tick();
+  refreshCountdownTimer = setInterval(tick, 1000);
+  window.addEventListener('unload', () => clearInterval(refreshCountdownTimer), { once: true });
+}
+
 /* ── Load and render state ────────────────────────────────────────── */
 
 async function loadState() {
@@ -133,6 +159,7 @@ async function loadState() {
 
   // Refresh interval
   el('pref-refresh').value = prefs.refreshInterval ?? 30;
+  startRefreshCountdown();
 }
 
 /* ── Save helpers ─────────────────────────────────────────────────── */
