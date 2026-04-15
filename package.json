@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "package": "cd src && zip -r ../bingy.zip . && cd .. && echo 'Created bingy.zip'"
   },
   "devDependencies": {
     "jest": "^29.7.0"
