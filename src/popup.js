@@ -45,6 +45,44 @@ function updateMeter(type, value, threshold, label) {
   mrkEl.style.left    = '100%'; // threshold is always at 100 % of the bar scale
 }
 
+/* ── Reset countdown ──────────────────────────────────────────────── */
+
+/**
+ * Format milliseconds remaining into a human-readable string.
+ * e.g. 7380000 → "2h 3m", 90000 → "1m 30s", 45000 → "45s"
+ */
+function formatCountdown(ms) {
+  if (ms <= 0) return 'Resetting…';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) return `Resets in ${h}h ${m}m`;
+  if (m > 0) return `Resets in ${m}m ${s}s`;
+  return `Resets in ${s}s`;
+}
+
+let countdownTimer = null;
+
+function startCountdown(resetAt) {
+  clearInterval(countdownTimer);
+  const countdownEl = el('reset-countdown');
+
+  if (!resetAt) {
+    countdownEl.textContent = '';
+    return;
+  }
+
+  function tick() {
+    const remaining = resetAt - Date.now();
+    countdownEl.textContent = remaining > 0 ? formatCountdown(remaining) : 'Resetting…';
+    if (remaining <= 0) clearInterval(countdownTimer);
+  }
+
+  tick();
+  countdownTimer = setInterval(tick, 1000);
+}
+
 /* ── Load and render state ────────────────────────────────────────── */
 
 async function loadState() {
@@ -73,8 +111,9 @@ async function loadState() {
     snapshot.spend !== null ? `€${snapshot.spend.toFixed(2)}` : null,
   );
 
-  // Reset text
+  // Reset text and live countdown
   el('reset-text').textContent = snapshot.resetText ?? '';
+  startCountdown(snapshot.resetAt ?? null);
 
   // Last updated
   if (snapshot.lastUpdated) {
