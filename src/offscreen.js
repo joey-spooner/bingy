@@ -15,6 +15,11 @@ chrome.runtime.onMessage.addListener((msg) => {
       notifyDone();
     });
   }
+  if (msg.type === 'PLAY_EXTRA') {
+    playMp3('sounds/my-money-dont-jiggle-jiggle.mp3').catch(() => {
+      notifyDone();
+    });
+  }
 });
 
 async function playBing() {
@@ -47,6 +52,12 @@ async function playBing() {
     ctx.close();
     notifyDone();
   };
+}
+
+async function playMp3(src) {
+  const audio = new Audio(chrome.runtime.getURL(src));
+  audio.onended = notifyDone;
+  await audio.play();
 }
 
 function notifyDone() {

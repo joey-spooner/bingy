@@ -136,6 +136,12 @@ async function loadState() {
     thresholds.spend,
     snapshot.spend !== null ? `€${snapshot.spend.toFixed(2)}` : null,
   );
+  updateMeter(
+    'extra',
+    snapshot.extraPct,
+    thresholds.extra ?? 80,
+    snapshot.extraPct !== null ? `${snapshot.extraPct}%` : null,
+  );
 
   // Reset text and live countdown
   el('reset-text').textContent = snapshot.resetText ?? '';
@@ -152,6 +158,7 @@ async function loadState() {
   el('thr-session').value = thresholds.session;
   el('thr-weekly').value  = thresholds.weekly;
   el('thr-spend').value   = thresholds.spend;
+  el('thr-extra').value   = thresholds.extra ?? 80;
 
   // Pref checkboxes
   el('pref-sound').checked         = prefs.soundEnabled;
@@ -171,6 +178,7 @@ function saveSettings() {
       session: Number(el('thr-session').value),
       weekly:  Number(el('thr-weekly').value),
       spend:   Number(el('thr-spend').value),
+      extra:   Number(el('thr-extra').value),
     },
     prefs: {
       soundEnabled:         el('pref-sound').checked,
@@ -193,7 +201,7 @@ function debouncedSave() {
 document.addEventListener('DOMContentLoaded', () => {
   loadState();
 
-  ['thr-session', 'thr-weekly', 'thr-spend'].forEach((id) => {
+  ['thr-session', 'thr-weekly', 'thr-spend', 'thr-extra'].forEach((id) => {
     el(id).addEventListener('input', debouncedSave);
   });
 
@@ -205,5 +213,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el('btn-test-sound').addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'TEST_BING' });
+  });
+
+  el('open-usage').addEventListener('click', (e) => {
+    e.preventDefault();
+    const USAGE_URL = 'https://claude.ai/settings/usage';
+    chrome.tabs.query({ url: USAGE_URL }, (tabs) => {
+      if (tabs.length > 0) {
+        chrome.tabs.update(tabs[0].id, { active: true });
+        chrome.windows.update(tabs[0].windowId, { focused: true });
+      } else {
+        chrome.tabs.create({ url: USAGE_URL });
+      }
+      window.close();
+    });
   });
 });

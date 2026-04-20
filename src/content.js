@@ -31,7 +31,7 @@ const SPEND_RE = /€\s?(\d+(?:\.\d{1,2})?)/;
  * @returns {{ sessionPct: number|null, weeklyPct: number|null, spend: number|null, resetText: string|null }}
  */
 function parseSnapshot(text) {
-  const result = { sessionPct: null, weeklyPct: null, spend: null, resetText: null };
+  const result = { sessionPct: null, weeklyPct: null, spend: null, resetText: null, extraPct: null };
 
   const pcts = [...text.matchAll(PERCENT_RE)];
   if (pcts[0]) result.sessionPct = parseInt(pcts[0][1], 10);
@@ -53,6 +53,14 @@ function parseSnapshot(text) {
 function scrapeAndSend() {
   const text = document.body?.innerText ?? '';
   const snapshot = parseSnapshot(text);
+
+  // Extra usage lives in a dedicated section — scope the text to that element
+  // so we don't accidentally grab a third "X% used" from elsewhere on the page.
+  const extraEl = document.getElementById('extra-usage-section');
+  if (extraEl) {
+    const m = extraEl.innerText.match(/(\d{1,3})%\s*used/i);
+    snapshot.extraPct = m ? parseInt(m[1], 10) : null;
+  }
 
   // Two distinct failure modes require two distinct guards:
   //

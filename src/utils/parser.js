@@ -10,6 +10,9 @@
 // Matches "87% used", "100% used" etc.
 const PERCENT_RE = /(\d{1,3})%\s*used/gi;
 
+// Matches a single "X% used" within a scoped text block (e.g. extra-usage-section).
+const SINGLE_PERCENT_RE = /(\d{1,3})%\s*used/i;
+
 // Matches "Resets in 3 days", "Resets on Sunday", etc.
 const RESET_RE = /Resets\s+[^\n]+/i;
 
@@ -25,12 +28,26 @@ const SPEND_RE = /€\s?(\d+(?:\.\d{1,2})?)/;
  * @param {string} text - document.body.innerText of the usage page
  * @returns {{ sessionPct: number|null, weeklyPct: number|null, spend: number|null, resetText: string|null }}
  */
+/**
+ * Parse the extra usage percentage from the text of the #extra-usage-section
+ * element. Content script passes this text separately so we avoid scanning
+ * the whole page for a third "X% used" match (order is not guaranteed).
+ *
+ * @param {string} text - innerText of the extra-usage-section element
+ * @returns {number|null}
+ */
+export function parseExtraSection(text) {
+  const match = text.match(SINGLE_PERCENT_RE);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 export function parseSnapshot(text) {
   const result = {
     sessionPct: null,
-    weeklyPct: null,
-    spend: null,
-    resetText: null,
+    weeklyPct:  null,
+    spend:      null,
+    resetText:  null,
+    extraPct:   null,
   };
 
   // Extract all "X% used" matches in document order

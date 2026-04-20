@@ -11,6 +11,7 @@
   <header>
     <h1>Bingy 🔔</h1>
     <span class="last-updated" id="last-updated"></span>
+    <a id="open-usage" href="#" title="Open Claude usage page">Open usage tab</a>
   </header>
 
   <!-- ── Usage meters ─────────────────────────────────────── -->
@@ -50,6 +51,17 @@
       </div>
     </div>
 
+    <div class="meter">
+      <div class="meter-label">
+        <span>Extra</span>
+        <span class="meter-value" id="val-extra">—</span>
+      </div>
+      <div class="bar-track">
+        <div class="bar-fill" id="bar-extra"></div>
+        <div class="bar-threshold" id="thr-marker-extra"></div>
+      </div>
+    </div>
+
     <p class="reset-text" id="reset-text"></p>
     <p class="reset-countdown" id="reset-countdown"></p>
   </section>
@@ -79,6 +91,14 @@
       <div class="input-wrap">
         <span class="unit prefix">€</span>
         <input type="number" id="thr-spend" min="1" step="1">
+      </div>
+    </label>
+
+    <label class="field">
+      Extra
+      <div class="input-wrap">
+        <input type="number" id="thr-extra" min="1" max="100" step="1">
+        <span class="unit">%</span>
       </div>
     </label>
   </section>

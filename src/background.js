@@ -25,11 +25,13 @@ const DEFAULT_STATE = {
     session: 80,  // percent
     weekly:  80,  // percent
     spend:   10,  // euros
+    extra:   80,  // percent
   },
   triggered: {
     session: false,
     weekly:  false,
     spend:   false,
+    extra:   false,
   },
   prefs: {
     soundEnabled:         true,
@@ -47,7 +49,17 @@ const DEFAULT_STATE = {
 let state = structuredClone(DEFAULT_STATE);
 
 const stateReady = chrome.storage.local.get('state').then(async (data) => {
-  if (data.state) state = data.state;
+  if (data.state) {
+    // Deep-merge so new default keys (e.g. thresholds.extra) survive upgrades.
+    state = {
+      ...DEFAULT_STATE,
+      ...data.state,
+      thresholds: { ...DEFAULT_STATE.thresholds, ...data.state.thresholds },
+      triggered:  { ...DEFAULT_STATE.triggered,  ...data.state.triggered  },
+      prefs:      { ...DEFAULT_STATE.prefs,       ...data.state.prefs      },
+      snapshot:   { ...DEFAULT_STATE.snapshot,    ...data.state.snapshot   },
+    };
+  }
   await setupRefreshAlarm(); // start refresh cycle based on saved settings
 });
 
@@ -118,6 +130,7 @@ async function handleSnapshot(snap) {
   await checkPercent('session', snap.sessionPct, state.thresholds.session);
   await checkPercent('weekly',  snap.weeklyPct,  state.thresholds.weekly);
   await checkSpend(snap.spend, state.thresholds.spend);
+  await checkPercent('extra',   snap.extraPct,   state.thresholds.extra);
 
   await scheduleResetAlarm(resetAt);
   await saveState();
@@ -178,11 +191,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // Alert delivery
 // ---------------------------------------------------------------------------
 
-const LABELS = { session: 'Session', weekly: 'Weekly', spend: 'Spend', reset: 'Session reset' };
+const LABELS = { session: 'Session', weekly: 'Weekly', spend: 'Spend', extra: 'Extra', reset: 'Session reset' };
 
 async function fireAlert(type, valueStr, thresholdStr) {
   if (state.prefs.soundEnabled) {
-    await playBing();
+    if (type === 'extra') await playExtra();
+    else await playBing();
   }
   if (state.prefs.notificationsEnabled) {
     const isReset = type === 'reset';
@@ -277,6 +291,36 @@ async function playBing() {
     clearTimeout(bingGuardTimer);
     bingInProgress = false;
     console.error('[Bingy] playBing failed:', err);
+  }
+}
+
+async function playExtra() {
+  if (bingInProgress) return;
+  bingInProgress = true;
+
+  // MP3 is longer than the bing tone — give it up to 15 s before releasing.
+  bingGuardTimer = setTimeout(() => { bingInProgress = false; }, 15_000);
+
+  try {
+    const contexts = await chrome.runtime.getContexts({
+      contextTypes: ['OFFSCREEN_DOCUMENT'],
+    });
+
+    if (!contexts.length) {
+      await chrome.offscreen.createDocument({
+        url:           'offscreen.html',
+        reasons:       ['AUDIO_PLAYBACK'],
+        justification: 'Play extra usage alert sound',
+      });
+    }
+
+    chrome.runtime.sendMessage({ type: 'PLAY_EXTRA' }, () => {
+      void chrome.runtime.lastError;
+    });
+  } catch (err) {
+    clearTimeout(bingGuardTimer);
+    bingInProgress = false;
+    console.error('[Bingy] playExtra failed:', err);
   }
 }
 
