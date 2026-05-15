@@ -4,6 +4,19 @@ Track all work sessions here. Add a new entry at the top for each session.
 
 ---
 
+## 2026-05-15 — Enable/disable toggle + greyscale icon
+
+**Session:** Add master on/off toggle to pause monitoring
+**By:** Claude (via Claude Code)
+**Changes:**
+- `src/background.js` — `enabled: true` added to DEFAULT_STATE; `TOGGLE_ENABLED` message handler; `handleSnapshot` early-returns when paused; `setupRefreshAlarm` and refresh alarm tick skip when paused; `updateActionIcon()` using OffscreenCanvas for greyscale icon when disabled; called on SW startup and on toggle
+- `src/popup.html` — `.enabled-bar` div with checkbox toggle between header and usage meters
+- `src/popup.js` — `updateEnabledUI()` helper; `loadState()` reads `state.enabled`; `change` listener sends `TOGGLE_ENABLED`
+- `src/popup.css` — green active / amber paused styles for `.enabled-bar`
+- `docs/features/enable-disable-toggle.md` — feature documentation
+
+---
+
 ## 2026-04-15 — Reset timer + bug fix
 
 **Session:** Add reset timer feature; fix content.js console error

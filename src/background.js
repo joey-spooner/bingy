@@ -13,6 +13,7 @@ import { shouldAlert, shouldReset, parseResetTime } from './utils/parser.js';
 // ---------------------------------------------------------------------------
 
 const DEFAULT_STATE = {
+  enabled: true,  // master on/off switch
   snapshot: {
     sessionPct:  null,
     weeklyPct:   null,
@@ -61,6 +62,7 @@ const stateReady = chrome.storage.local.get('state').then(async (data) => {
     };
   }
   await setupRefreshAlarm(); // start refresh cycle based on saved settings
+  await updateActionIcon();  // restore correct icon after service worker restart
 });
 
 async function saveState() {
@@ -102,6 +104,14 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           await setupRefreshAlarm(); // reconfigure if interval changed
           break;
 
+        case 'TOGGLE_ENABLED':
+          state.enabled = !(state.enabled ?? true);
+          await saveState();
+          await updateActionIcon();
+          await setupRefreshAlarm();
+          sendResponse({ enabled: state.enabled });
+          break;
+
         case 'TEST_BING':
           await playBing();
           break;
@@ -121,6 +131,8 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 // ---------------------------------------------------------------------------
 
 async function handleSnapshot(snap) {
+  if (!(state.enabled ?? true)) return; // ignore snapshots when paused
+
   const prev    = state.snapshot;
   const resetAt = parseResetTime(snap.resetText);
   state.snapshot = { ...snap, resetAt, lastUpdated: Date.now() };
@@ -173,7 +185,7 @@ async function scheduleResetAlarm(resetAt) {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === REFRESH_ALARM) {
     await stateReady;
-    await refreshUsageTab();
+    if (state.enabled ?? true) await refreshUsageTab(); // skip when paused
     return;
   }
 
@@ -224,6 +236,7 @@ const USAGE_URL     = 'https://claude.ai/settings/usage*';
  */
 async function setupRefreshAlarm() {
   await chrome.alarms.clear(REFRESH_ALARM);
+  if (!(state.enabled ?? true)) return; // don't poll when paused
   const secs = state.prefs.refreshInterval ?? 30;
   if (secs <= 0) return; // 0 = disabled
   // Chrome clamps periodInMinutes to 1 min for store extensions;
@@ -249,6 +262,44 @@ async function refreshUsageTab() {
     // can scrape and send fresh data without the user needing to visit manually.
     chrome.tabs.create({ url: 'https://claude.ai/settings/usage', active: false });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Icon state (reflects enabled/disabled)
+// ---------------------------------------------------------------------------
+
+/**
+ * Update the toolbar icon to reflect the current enabled state.
+ * When paused, the icon is rendered in greyscale using OffscreenCanvas.
+ */
+async function updateActionIcon() {
+  const enabled = state.enabled ?? true;
+  const sizes   = [16, 48, 128];
+  const imageData = {};
+
+  for (const size of sizes) {
+    const canvas = new OffscreenCanvas(size, size);
+    const ctx    = canvas.getContext('2d');
+
+    const response = await fetch(chrome.runtime.getURL(`icons/icon${size}.png`));
+    const blob     = await response.blob();
+    const bitmap   = await createImageBitmap(blob);
+    ctx.drawImage(bitmap, 0, 0, size, size);
+
+    if (!enabled) {
+      const imgData = ctx.getImageData(0, 0, size, size);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const gray = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+        d[i] = d[i + 1] = d[i + 2] = gray;
+      }
+      ctx.putImageData(imgData, 0, 0);
+    }
+
+    imageData[size] = ctx.getImageData(0, 0, size, size);
+  }
+
+  await chrome.action.setIcon({ imageData });
 }
 
 // ---------------------------------------------------------------------------

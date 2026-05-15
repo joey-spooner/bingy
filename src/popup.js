@@ -111,11 +111,20 @@ async function startRefreshCountdown() {
 
 /* ── Load and render state ────────────────────────────────────────── */
 
+function updateEnabledUI(enabled) {
+  el('enabled-bar').classList.toggle('paused', !enabled);
+  el('enabled-label').textContent = enabled ? 'Monitoring active' : 'Monitoring paused';
+  el('pref-enabled').checked = enabled;
+}
+
 async function loadState() {
   const { state } = await chrome.storage.local.get('state');
   if (!state) return;
 
   const { snapshot, thresholds, prefs } = state;
+
+  // Enabled toggle
+  updateEnabledUI(state.enabled ?? true);
 
   // Meters
   updateMeter(
@@ -207,6 +216,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   ['pref-sound', 'pref-notifications'].forEach((id) => {
     el(id).addEventListener('change', saveSettings);
+  });
+
+  el('pref-enabled').addEventListener('change', () => {
+    chrome.runtime.sendMessage({ type: 'TOGGLE_ENABLED' }, (resp) => {
+      updateEnabledUI(resp?.enabled ?? el('pref-enabled').checked);
+    });
   });
 
   el('pref-refresh').addEventListener('input', debouncedSave);
