@@ -229,6 +229,11 @@ async function fireAlert(type, valueStr, thresholdStr) {
 
 const REFRESH_ALARM = 'bingy-refresh';
 const USAGE_URL     = 'https://claude.ai/settings/usage*';
+const USAGE_URL_FULL = 'https://claude.ai/settings/usage';
+
+// In-memory reference to the background tab Bingy opened.
+// Lost on service-worker restart, but the URL query below recovers gracefully.
+let bgTabId = null;
 
 /**
  * Create (or recreate) the repeating refresh alarm.
@@ -248,6 +253,9 @@ async function setupRefreshAlarm() {
  * Reload the claude.ai/settings/usage tab so the page re-fetches fresh
  * data from Anthropic's servers. If no usage tab is open, opens one in
  * the background so the content script can scrape fresh data.
+ *
+ * Tracks the opened tab ID so subsequent calls reload the same tab rather
+ * than opening new ones (avoids spawning a new browser window each cycle).
  */
 async function refreshUsageTab() {
   const usageTabs = await chrome.tabs.query({ url: USAGE_URL });
@@ -257,11 +265,33 @@ async function refreshUsageTab() {
     for (const tab of usageTabs) {
       chrome.tabs.reload(tab.id);
     }
-  } else {
-    // No usage tab open: create one in the background so the content script
-    // can scrape and send fresh data without the user needing to visit manually.
-    chrome.tabs.create({ url: 'https://claude.ai/settings/usage', active: false });
+    // Keep bgTabId in sync with whatever tab we found.
+    bgTabId = usageTabs[0].id;
+    return;
   }
+
+  // No usage tab found by URL. If we still have our background tab, navigate
+  // it back to the usage page instead of opening a new one.
+  if (bgTabId !== null) {
+    try {
+      await chrome.tabs.get(bgTabId); // throws if the tab no longer exists
+      chrome.tabs.update(bgTabId, { url: USAGE_URL_FULL });
+      return;
+    } catch {
+      bgTabId = null; // tab was closed; fall through to create a new one
+    }
+  }
+
+  // No existing tab to reuse — create one. Anchor it to an existing normal
+  // window so Chrome doesn't open a brand-new browser window.
+  const windows = await chrome.windows.getAll({ windowTypes: ['normal'] });
+  const windowId = windows.length > 0 ? windows[0].id : undefined;
+  const tab = await chrome.tabs.create({
+    url: USAGE_URL_FULL,
+    active: false,
+    ...(windowId !== undefined && { windowId }),
+  });
+  bgTabId = tab.id;
 }
 
 // ---------------------------------------------------------------------------
